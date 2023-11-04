@@ -10,7 +10,7 @@ int seconds = 0;
 int minutes = 0; 
 int hour = 0;
 int day = 25;
-int month = 2;
+int month = 1;
 int year = 2000;
 
 
