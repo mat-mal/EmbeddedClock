@@ -3,16 +3,20 @@
 #include "app_api.h"
 #include<LiquidCrystal.h>
 
-typedef char* strin;
+const int pos_offset = 5;
+const int alarmpin = 8;
 
 LiquidCrystal lcd(2,3,4,5,6,7);
 int seconds = 0;
 int minutes = 0; 
 int hour = 0;
-int day = 25;
-int month = 2;
-int year = 2000;
-
+int day = 4;
+int month = 6;
+int year = 2023;
+String sdayofweek_eng[7] = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
+String sdayofweek_pl[7] = {" Nd", " Pn", " Wt", " Śr", "Czw", " Pt", " So"};
+bool dst = true;
+int adddst;
 
 byte Bell[] = {
     B00000,
@@ -29,6 +33,7 @@ byte Bell[] = {
 void digitalclock();
 bool IsLeapYear(int year);
 void blinkincolon();
+int dayofweek(int y, int m, int d);
 
 void setup()
 {
@@ -36,14 +41,14 @@ void setup()
     //Serial.begin(9600);
     lcd.begin(16, 2);
     lcd.clear();
-    lcd.setCursor(7, 0);
-    lcd.print("0:00");
-    lcd.setCursor(3, 1);
-    lcd.print("25.02.2000");
+    // lcd.setCursor(pos_offset, 0);
+    // lcd.print("0:00");
+    // lcd.setCursor(pos_offset - 3, 1);
+    // lcd.print("25.02.2000");
 
+    pinMode(alarmpin, OUTPUT);
     lcd.createChar(0, Bell);
     //lcd.print("test");
-
 }
 
 void loop()
@@ -103,24 +108,37 @@ void digitalclock()
         }
     }
 
-    lcd.setCursor(6, 0);
-    if(hour < 10)
+    if(dst)
+    {
+        adddst = 1;
+    }
+    else
+    {
+        adddst = 0;
+    }
+
+    lcd.setCursor(pos_offset, 0);
+    if(hour + adddst < 10)
     {
         lcd.print(" ");
     }
-    lcd.print(hour);
+    lcd.print(hour + adddst);
     lcd.print(":");
 
     snprintf(sminutes, 3, "%02d", minutes);
-    lcd.setCursor(9, 0);
+    lcd.setCursor(pos_offset + 3, 0);
     lcd.print(sminutes);
     // lcd.print(":");
 
     // snprintf(sseconds, 3, "%02d", seconds);
     // lcd.setCursor(10, 0);
     // lcd.print(sseconds);
+    
+    lcd.setCursor(13, 0);
+    lcd.print(sdayofweek_pl[dayofweek(year, month, day)]);
 
-    lcd.setCursor(3, 1);
+
+    lcd.setCursor(pos_offset - 3, 1);
     if(day < 10)
     {
         lcd.print(" ");
@@ -169,5 +187,26 @@ void blinkincolon()
     delay(500);
     lcd.setCursor(8, 0);
     lcd.print(":");
+    delay(500);
+}
+
+int dayofweek(int y, int m, int d)
+{
+    static int t[] = {0, 3, 2, 5, 0, 3, 5, 1, 4, 6, 2, 4};
+
+    if(m < 3)
+    {
+        y -= 1;
+    }
+    int dow = (y + y/4 - y/100 + y/400 + t[m-1] + d)%7; 
+
+    return dow;
+}
+
+void alarm()
+{
+    digitalWrite(alarmpin, HIGH);
+    delay(500);
+    digitalWrite(alarmpin, LOW);
     delay(500);
 }
