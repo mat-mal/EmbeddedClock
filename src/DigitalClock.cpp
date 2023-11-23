@@ -18,40 +18,59 @@ const int clockElementsAmount = 6;
 struct _Alarm
 {
     unsigned long alarm_temp = 0;
-    bool setAlarm_flag = true;
+    bool enterSetAlarm_flag = false;
     bool alarmOn_flag = false;
+    bool armed_flag = true;
     int alarmState = LOW;
+    int numberOfElements = 2;
+    int alarmTime[2] = {60, 24};
+    int* minutes = &alarmTime[0];
+    int* hour = &alarmTime[1];
+    int count = 0;
+    int positions[2] = {POS_OFFSET + 3,  POS_OFFSET};
+    char sAlarmTime[2][3] = {};
+
 };
 
 struct _Clock
 {
-    int elementsValue[6] = {50, 59, 23, 0, 0, 2023};
+    int elementsValue[6] = {50, 59, 23, 2023, 1, 0};
     int* seconds = &elementsValue[0];
     int* minutes = &elementsValue[1]; 
     int* hour = &elementsValue[2];
-    int* day = &elementsValue[3];
+    int* day = &elementsValue[5];
     int* month = &elementsValue[4];
-    int* year = &elementsValue[5];
-    int elementsPositions[6] = {POS_OFFSET + 6, POS_OFFSET + 3,  POS_OFFSET, POS_OFFSET - 3, POS_OFFSET, POS_OFFSET + 3};
+    int* year = &elementsValue[3];
+    int elementsPositions[6] = {POS_OFFSET + 6, POS_OFFSET + 3,  POS_OFFSET, POS_OFFSET + 3, POS_OFFSET, POS_OFFSET - 3};
     String sdayofweek_eng[7] = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
-    String sdayofweek_pl[7] = {" Nd", " Pn", " Wt", " Śr", "Czw", " Pt", " So"};
+    String sdayofweek_pl[7] = {" Nd", " Pn", " Wt", " Sr", "Czw", " Pt", " So"};
     int dst = 1;
     char sClockElements[6][5] = {};
     bool digitalclock_flag = true;
     bool dstAdded = false;
+    bool displayClock_flag = true;
 };
+
+struct _Button
+{
+    unsigned long button_temp = 0;
+    bool hold_flag;
+    unsigned long hold_temp;
+    int lastState = HIGH;
+};
+
 
 _Alarm Alarm;
 _Clock Clock;
-unsigned long currenttime = 0, clock_temp = 0, beep_temp = 0, setclock_temp = 0, setbutton_temp = 0, show_temp = 0, setclock_temp2 = 0, leftbutton_temp = 0, rightbutton_temp = 0;
+_Button LButton;
+_Button RButton;
+_Button SetButton;
+unsigned long currenttime = 0, clock_temp = 0, beep_temp = 0, setclock_temp = 0, show_temp = 0, setclock_temp2 = 0;
 
 
 
 int beepcounter = 0;
 bool beepon = false;
-int lastSetButtonState = HIGH;
-int lastRightButtonState = HIGH;
-int lastLeftButtonState = HIGH;
 int countmiliseconds = 0;
 bool timer_flag = false;
 bool setclock_flag = false;
@@ -89,8 +108,11 @@ int pushsetbutton();
 int pushLeftButton();
 int pushRightButton();
 int Mod(int A, int B);
-void ClockToString(int value, int i);
-
+void ClockToString(int value, int i, char* sValue);
+void SetAlarm();
+int HoldSetButton();
+void EnterSetAlarm();
+void DisplayClock();
 
 void setup()
 {
@@ -130,6 +152,7 @@ void loop()
     }
     else
     {
+        setclock_temp = 0;
         entersetclock_flag = false;
     }
 
@@ -148,11 +171,14 @@ void loop()
     }
 
 
-    //pushsetbutton();
+    DisplayClock();
     setclock();
     beep();
     TurnOnAlarm();
     brightnessControl();
+    // HoldSetButton();
+    EnterSetAlarm();
+    SetAlarm();
 
 
     // Serial.println(timepassed);
@@ -161,6 +187,7 @@ void loop()
 
 void digitalclock()
 {
+    (*Clock.seconds)++;
     if(*Clock.seconds > 59)
     {
         *Clock.seconds = 0;
@@ -176,30 +203,30 @@ void digitalclock()
                 *Clock.hour = 0;
                 (*Clock.day)++;
 
-                if(*Clock.day > 31 && (*Clock.month == 1 || *Clock.month == 3 || *Clock.month == 5 || *Clock.month == 7 || *Clock.month == 8 || *Clock.month == 10 || *Clock.month == 12))
+                if(*Clock.day > 30 && (*Clock.month == 0 || *Clock.month == 2 || *Clock.month == 4 || *Clock.month == 6 || *Clock.month == 7 || *Clock.month == 9 || *Clock.month == 11))
                 {
-                    *Clock.day = 1;
+                    *Clock.day = 0;
                     (*Clock.month)++;
 
-                    if(*Clock.month > 12)
+                    if(*Clock.month > 11)
                     {
-                        *Clock.month = 1;
+                        *Clock.month = 0;
                         (*Clock.year)++;
                     }
                 }
-                else if(*Clock.day > 30 && (*Clock.month == 4 || *Clock.month == 6 || *Clock.month == 9 || *Clock.month == 11))
+                else if(*Clock.day > 29 && (*Clock.month == 3 || *Clock.month == 5 || *Clock.month == 8 || *Clock.month == 10))
                 {
-                    *Clock.day = 1;
+                    *Clock.day = 0;
                     (*Clock.month)++;
                 }                  
-                else if(*Clock.day > 28 && *Clock.month == 2 && !IsLeapYear(*Clock.year))
+                else if(*Clock.day > 27 && *Clock.month == 1 && !IsLeapYear(*Clock.year))
                 {
-                    *Clock.day = 1;
+                    *Clock.day = 0;
                     (*Clock.month)++;
                 }
-                else if(*Clock.day > 29 && *Clock.month == 2)
+                else if(*Clock.day > 28 && *Clock.month == 1)
                 {
-                    *Clock.day = 1;
+                    *Clock.day = 0;
                     (*Clock.month)++;
                 }
             }
@@ -213,23 +240,11 @@ void digitalclock()
     // snprintf(Clock.sClockElements[4], 3, "%02d", Clock.month);
     // snprintf(Clock.sClockElements[5], 5, "%4d", Clock.year);    
 
-    for(int i = 0; i < clockElementsAmount; i++)
-    {
-        // displayValue(Clock.elementsPositions[i], (int)i/3.0,  Clock.sClockElements[i]);
-        ClockToString(Clock.elementsValue[i], i);
-        displayValue(Clock.elementsPositions[i], (int)i/3.0, Clock.sClockElements[i]);
-    }
 
-    lcd.setCursor(13, 0);
-    lcd.print(Clock.sdayofweek_pl[dayofweek(*Clock.year, *Clock.month, *Clock.day)]);
-
-    //Serial.print(sseconds);
-
-    displaySigns();
     
-    (*Clock.seconds)++;
+    
     //day++;
-    if(Alarm.setAlarm_flag && *Clock.hour == 1 && *Clock.minutes == 60)
+    if(Alarm.armed_flag && *Clock.hour == 1 && *Clock.minutes == 60)
     {
         Alarm.alarmOn_flag = true;
     }
@@ -299,6 +314,7 @@ void brightnessControl()
 {
     int ilumination = analogRead(FOTO_PIN);
     ilumination = map(ilumination, 0, 1023, 10, 255);
+    ilumination = 125;
     analogWrite(BRIGHTNESS_PIN, ilumination);
 }
 
@@ -351,39 +367,40 @@ void setclock()
                 case 0:
                 case 1:
                     Clock.elementsValue[setclock_countposition] = Mod(Clock.elementsValue[setclock_countposition] - 1, 60);
-                    ClockToString(Clock.elementsValue[setclock_countposition], setclock_countposition);
+                    ClockToString(Clock.elementsValue[setclock_countposition], setclock_countposition, Clock.sClockElements[setclock_countposition]);
                     break;
                 case 2:
                     Clock.elementsValue[setclock_countposition] = Mod(Clock.elementsValue[setclock_countposition] - 1, 24);
-                    ClockToString(Clock.elementsValue[setclock_countposition], setclock_countposition);
+                    ClockToString(Clock.elementsValue[setclock_countposition], setclock_countposition, Clock.sClockElements[setclock_countposition]);
                     break;
                 case 3:
+                    Clock.elementsValue[setclock_countposition] = Mod(Clock.elementsValue[setclock_countposition] - 1, 9999);
+                    ClockToString(Clock.elementsValue[setclock_countposition], setclock_countposition, Clock.sClockElements[setclock_countposition]);
+                    break;   
+                case 4:
+                    Clock.elementsValue[setclock_countposition] = Mod(Clock.elementsValue[setclock_countposition] - 1, 12);
+                    ClockToString(Clock.elementsValue[setclock_countposition], setclock_countposition, Clock.sClockElements[setclock_countposition]);
+                    break;                                      
+                case 5:
                     if(*Clock.month == 0 || *Clock.month == 2 || *Clock.month == 4 || *Clock.month == 6 || *Clock.month == 7 || *Clock.month == 9 || *Clock.month == 11)
                     {
                         Clock.elementsValue[setclock_countposition] = Mod(Clock.elementsValue[setclock_countposition] - 1, 31);
                     }
-                    else if(*Clock.month == 3 || *Clock.month == 5 || *Clock.month == 8 || *Clock.month == 1)
+                    else if(*Clock.month == 3 || *Clock.month == 5 || *Clock.month == 8 || *Clock.month == 10)
                     {
                         Clock.elementsValue[setclock_countposition] = Mod(Clock.elementsValue[setclock_countposition] - 1, 30);
                     }
                     else if(*Clock.month == 1 && !IsLeapYear(*Clock.year))
                     {
+                        // Clock.elementsValue[setclock_countposition] = Mod(Clock.elementsValue[setclock_countposition], 28);
                         Clock.elementsValue[setclock_countposition] = Mod(Clock.elementsValue[setclock_countposition] - 1, 28);
                     }
                     else if(*Clock.month == 1)
                     {
                         Clock.elementsValue[setclock_countposition] = Mod(Clock.elementsValue[setclock_countposition] - 1, 29);
                     }
-                    ClockToString(Clock.elementsValue[setclock_countposition], setclock_countposition);
-                    break;
-                case 4:
-                    Clock.elementsValue[setclock_countposition] = Mod(Clock.elementsValue[setclock_countposition] - 1, 12);
-                    ClockToString(Clock.elementsValue[setclock_countposition], setclock_countposition);
-                    break;
-                case 5:
-                    Clock.elementsValue[setclock_countposition] = Mod(Clock.elementsValue[setclock_countposition] - 1, 9999);
-                    ClockToString(Clock.elementsValue[setclock_countposition], setclock_countposition);
-                    break;                                                        
+                    ClockToString(Clock.elementsValue[setclock_countposition], setclock_countposition, Clock.sClockElements[setclock_countposition]);
+                    break;                               
                 default:
                     break;
                 }
@@ -396,13 +413,21 @@ void setclock()
                 case 0:
                 case 1:
                     Clock.elementsValue[setclock_countposition] = Mod(Clock.elementsValue[setclock_countposition] + 1, 60);
-                    ClockToString(Clock.elementsValue[setclock_countposition], setclock_countposition);
+                    ClockToString(Clock.elementsValue[setclock_countposition], setclock_countposition, Clock.sClockElements[setclock_countposition]);
                     break;
                 case 2:
                     Clock.elementsValue[setclock_countposition] = Mod(Clock.elementsValue[setclock_countposition] + 1, 24);
-                    ClockToString(Clock.elementsValue[setclock_countposition], setclock_countposition);
+                    ClockToString(Clock.elementsValue[setclock_countposition], setclock_countposition, Clock.sClockElements[setclock_countposition]);
                     break;
                 case 3:
+                    Clock.elementsValue[setclock_countposition] = Mod(Clock.elementsValue[setclock_countposition] + 1, 9999);
+                    ClockToString(Clock.elementsValue[setclock_countposition], setclock_countposition, Clock.sClockElements[setclock_countposition]);
+                    break;
+                case 4:
+                    Clock.elementsValue[setclock_countposition] = Mod(Clock.elementsValue[setclock_countposition] + 1, 12);
+                    ClockToString(Clock.elementsValue[setclock_countposition], setclock_countposition, Clock.sClockElements[setclock_countposition]);
+                    break;
+                case 5:
                     if(*Clock.month == 0 || *Clock.month == 2 || *Clock.month == 4 || *Clock.month == 6 || *Clock.month == 7 || *Clock.month == 9 || *Clock.month == 11)
                     {
                         Clock.elementsValue[setclock_countposition] = Mod(Clock.elementsValue[setclock_countposition] + 1, 31);
@@ -413,22 +438,15 @@ void setclock()
                     }
                     else if(*Clock.month == 1 && !IsLeapYear(*Clock.year))
                     {
+                        // Clock.elementsValue[setclock_countposition] = Mod(Clock.elementsValue[setclock_countposition], 28);
                         Clock.elementsValue[setclock_countposition] = Mod(Clock.elementsValue[setclock_countposition] + 1, 28);
                     }
                     else if(*Clock.month == 1)
                     {
                         Clock.elementsValue[setclock_countposition] = Mod(Clock.elementsValue[setclock_countposition] + 1, 29);
                     }
-                    ClockToString(Clock.elementsValue[setclock_countposition], setclock_countposition);
-                    break;
-                case 4:
-                    Clock.elementsValue[setclock_countposition] = Mod(Clock.elementsValue[setclock_countposition] + 1, 12);
-                    ClockToString(Clock.elementsValue[setclock_countposition], setclock_countposition);
-                    break;
-                case 5:
-                    Clock.elementsValue[setclock_countposition] = Mod(Clock.elementsValue[setclock_countposition] + 1, 9999);
-                    ClockToString(Clock.elementsValue[setclock_countposition], setclock_countposition);
-                    break;                                                        
+                    ClockToString(Clock.elementsValue[setclock_countposition], setclock_countposition, Clock.sClockElements[setclock_countposition]);
+                    break;                        
                 default:
                     break;
                 }
@@ -525,7 +543,7 @@ void displayValue(int position, int row, char* value)
     lcd.print(".");
     lcd.setCursor(7, 1);
     lcd.print(".");
-    if(Alarm.setAlarm_flag)
+    if(Alarm.armed_flag)
     {
         lcd.setCursor(15, 1);
         lcd.write(byte(0));
@@ -534,52 +552,84 @@ void displayValue(int position, int row, char* value)
 
 int pushsetbutton()
 {
-    int setbuttonpressed = 0;
-    if(timer(100, &setbutton_temp))
+    int buttonpressed = 0;
+    if(timer(100, &SetButton.button_temp))
     {
-        int currentSetState = digitalRead(SET_BUTTON_PIN);
+        int currentState = digitalRead(SET_BUTTON_PIN);
 
-        if(currentSetState == LOW && lastSetButtonState == HIGH)
+        if(currentState == LOW && SetButton.lastState == HIGH)
         {
             beepon = true;
-            setbuttonpressed = 1;
+            buttonpressed = 1;
         }
-        lastSetButtonState = currentSetState;
+        SetButton.lastState = currentState;
     }
-    return setbuttonpressed;
+    return buttonpressed;
 }
 
 int pushLeftButton()
 {
     int buttonpressed = 0;
-    if(timer(100, &leftbutton_temp))
+    int hold;
+    if(!LButton.hold_flag)
     {
-        int currentLeftState = digitalRead(LEFT_BUTTON_PIN);
-
-        if(currentLeftState == LOW && lastLeftButtonState == HIGH)
+        hold = 500;
+    }
+    else
+    {
+        hold = 250;
+    }
+    if(digitalRead(LEFT_BUTTON_PIN) == LOW)
+    {
+        if(timer(hold, &LButton.button_temp))
         {
+            if(timer(2000, &LButton.hold_temp))
+            {
+                LButton.hold_flag = true;
+            }
             beepon = true;
             buttonpressed = 1;
         }
-        lastLeftButtonState = currentLeftState;
     }
+    else
+    {
+        LButton.hold_temp = 0;
+        LButton.hold_flag = false;
+    }
+        
     return buttonpressed;
 }
 
 int pushRightButton()
 {
     int buttonpressed = 0;
-    if(timer(100, &rightbutton_temp))
+    int hold;
+    if(!RButton.hold_flag)
     {
-        int currentRightState = digitalRead(RIGHT_BUTTON_PIN);
-
-        if(currentRightState == LOW && lastRightButtonState == HIGH)
+        hold = 500;
+    }
+    else
+    {
+        hold = 250;
+    }
+    if(digitalRead(RIGHT_BUTTON_PIN) == LOW)
+    {
+        if(timer(hold, &RButton.button_temp))
         {
+            if(timer(2000, &RButton.hold_temp))
+            {
+                RButton.hold_flag = true;
+            }
             beepon = true;
             buttonpressed = 1;
         }
-        lastRightButtonState = currentRightState;
     }
+    else
+    {
+        RButton.hold_temp = 0;
+        RButton.hold_flag = false;
+    }
+        
     return buttonpressed;
 }
 
@@ -648,28 +698,113 @@ void blink(int position, int row, char* value)
 
 }
 
-void ClockToString(int value, int i)
+void ClockToString(int value, int i, char* sValue)
 {
     // char sValue[5] = {};
     switch(i)
     {
         case 0:
         case 1:
-            snprintf(Clock.sClockElements[i], 3, "%02d", value);
+            snprintf(sValue, 3, "%02d", value);
             break;        
         case 2:
-            snprintf(Clock.sClockElements[i], 3, "%2d", value);
+            snprintf(sValue, 3, "%2d", value);
             break;
         case 3:
-            snprintf(Clock.sClockElements[i], 3, "%2d", value + 1);
+            snprintf(sValue, 5, "%4d", value);
             break;
         case 4:
-            snprintf(Clock.sClockElements[i], 3, "%02d", value + 1);
+            snprintf(sValue, 3, "%02d", value + 1);
             break;            
         case 5:
-            snprintf(Clock.sClockElements[i], 5, "%4d", value);
+            snprintf(sValue, 3, "%2d", value + 1);
             break;
         default:
             break;   
+    }
+}
+
+void EnterSetAlarm()
+{
+    if(Clock.digitalclock_flag && HoldSetButton())
+    {
+        Alarm.enterSetAlarm_flag = true;
+        lcd.clear();
+        displayValue(Alarm.positions[0], 0, Clock.sClockElements[1]);
+        displayValue(Alarm.positions[1], 0, Clock.sClockElements[2]);
+    }
+}
+
+void SetAlarm()
+{
+    if(Alarm.enterSetAlarm_flag)
+    {
+        Clock.displayClock_flag = false;
+        *Alarm.minutes = *Clock.minutes;
+        *Alarm.hour = *Clock.hour;
+        lcd.setCursor(7, 0);
+        lcd.print(":");
+
+        if(Alarm.count < Alarm.numberOfElements)
+        {
+            ClockToString(Alarm.alarmTime[Alarm.count], Alarm.count, Alarm.sAlarmTime[Alarm.count]);
+            blink(Alarm.positions[Alarm.count], 0, Alarm.sAlarmTime[Alarm.count]);
+            if(pushsetbutton())
+            {
+                displayValue(Alarm.positions[Alarm.count], 0, Alarm.sAlarmTime[Alarm.count]);
+                Alarm.count++;
+            }
+            
+        }
+        else
+        {
+            Alarm.enterSetAlarm_flag = false;
+            Alarm.count = 0;
+        }
+    }
+    else
+    {
+        Clock.displayClock_flag = true;
+    }
+    
+ 
+}
+
+int HoldSetButton()
+{
+    int buttonhold = 0;
+    if(digitalRead(SET_BUTTON_PIN) == LOW)
+    {
+        if(!SetButton.hold_flag && timer(2000, &SetButton.hold_temp))
+        {
+            SetButton.hold_flag = true;
+            beepon = true;
+            buttonhold = 1;
+            SetButton.lastState = LOW;
+        }
+    }
+    else
+    {
+        SetButton.hold_temp = 0;
+        SetButton.hold_flag = false;
+        SetButton.lastState = HIGH;
+    }
+        
+    return buttonhold;
+}
+
+void DisplayClock()
+{
+    if(Clock.displayClock_flag && Clock.digitalclock_flag)
+    {
+        for(int i = 0; i < clockElementsAmount; i++)
+        {
+            ClockToString(Clock.elementsValue[i], i, Clock.sClockElements[i]);
+            displayValue(Clock.elementsPositions[i], (int)i/3.0, Clock.sClockElements[i]);
+        }
+
+        lcd.setCursor(13, 0);
+        lcd.print(Clock.sdayofweek_pl[dayofweek(*Clock.year, *Clock.month, *Clock.day)]);
+        displaySigns();
     }
 }
