@@ -19,16 +19,17 @@ struct _Alarm
 {
     unsigned long alarm_temp = 0;
     bool enterSetAlarm_flag = false;
-    bool alarmOn_flag = false;
-    bool armed_flag = true;
+    bool turnOn_flag = false;
+    bool armed_flag = false;
     int alarmState = LOW;
     int numberOfElements = 2;
-    int alarmTime[2] = {60, 24};
+    int alarmTime[2] = {0, 0};
     int* minutes = &alarmTime[0];
     int* hour = &alarmTime[1];
     int count = 0;
     int positions[2] = {POS_OFFSET + 3,  POS_OFFSET};
     char sAlarmTime[2][3] = {};
+    bool mute_flag = false;
 
 };
 
@@ -95,7 +96,7 @@ void digitalclock();
 bool IsLeapYear(int year);
 void blinkincolon();
 int dayofweek(int y, int m, int d);
-void TurnOnAlarm();
+void StartAlarm();
 void setalarm();
 void brightnessControl();
 void setclock();
@@ -113,6 +114,8 @@ void SetAlarm();
 int HoldSetButton();
 void EnterSetAlarm();
 void DisplayClock();
+void AlarmTurnOnOff();
+void EnterClockSetting();
 
 void setup()
 {
@@ -130,6 +133,7 @@ void setup()
     pinMode(SET_BUTTON_PIN, INPUT_PULLUP);
     pinMode(RIGHT_BUTTON_PIN, INPUT_PULLUP);
     lcd.createChar(0, Bell);
+
     //lcd.print("test");
     //alarm();
 }
@@ -141,20 +145,7 @@ void loop()
     // int currentRightState = digitalRead(RIGHT_BUTTON_PIN);
     // int currentLeftState = digitalRead(LEFT_BUTTON_PIN);
 
-    if(digitalRead(LEFT_BUTTON_PIN) == LOW && digitalRead(RIGHT_BUTTON_PIN) == LOW)
-    {
-        if(digitalRead(RIGHT_BUTTON_PIN) == LOW && digitalRead(LEFT_BUTTON_PIN) == LOW && !entersetclock_flag && timer(3000, &setclock_temp))
-        {
-            beepon = true;
-            entersetclock_flag = true;
-            setclock_flag = true;
-        }   
-    }
-    else
-    {
-        setclock_temp = 0;
-        entersetclock_flag = false;
-    }
+
 
     // lastLeftButtonState = currentLeftState;
     // lastRightButtonState = currentRightState; 
@@ -170,15 +161,17 @@ void loop()
         digitalclock();
     }
 
-
+    EnterClockSetting();
     DisplayClock();
     setclock();
-    beep();
-    TurnOnAlarm();
+    
+    StartAlarm();
     brightnessControl();
     // HoldSetButton();
     EnterSetAlarm();
     SetAlarm();
+    AlarmTurnOnOff();
+    beep();
 
 
     // Serial.println(timepassed);
@@ -244,15 +237,15 @@ void digitalclock()
     
     
     //day++;
-    if(Alarm.armed_flag && *Clock.hour == 1 && *Clock.minutes == 60)
-    {
-        Alarm.alarmOn_flag = true;
-    }
-    else
-    {
-        Alarm.alarmOn_flag = false;
-        digitalWrite(BUZZER_PIN, LOW);
-    }
+    // if(Alarm.armed_flag && *Clock.hour == *Alarm.hour && *Clock.minutes == *Alarm.minutes)
+    // {
+    //     Alarm.turnOn_flag = true;
+    // }
+    // else
+    // {
+    //     Alarm.turnOn_flag = false;
+    //     digitalWrite(BUZZER_PIN, LOW);
+    // }
     // else{
     //     delay(1000);
     // }
@@ -299,15 +292,32 @@ int dayofweek(int y, int m, int d)
     return dow;
 }
 
-void TurnOnAlarm()
+void StartAlarm()
 {   
-    if(Alarm.alarmOn_flag && currenttime - Alarm.alarm_temp >= 500)
+    if(Alarm.armed_flag && *Clock.hour == *Alarm.hour && *Clock.minutes == *Alarm.minutes)
+    {
+        if(!Alarm.mute_flag)
+        {
+            Alarm.turnOn_flag = true;
+        }
+        
+    }
+    else
+    {
+        Alarm.turnOn_flag = false;
+        Alarm.mute_flag = false;
+    }
+
+    if(Alarm.turnOn_flag && timer(500, &Alarm.alarm_temp))
     {
         digitalWrite(BUZZER_PIN, Alarm.alarmState);
         Alarm.alarmState = !Alarm.alarmState;
-        Alarm.alarm_temp = currenttime;
     }
-
+    if(!Alarm.turnOn_flag && Alarm.alarmState == HIGH)
+    {
+        Alarm.alarmState = LOW;
+        digitalWrite(BUZZER_PIN, Alarm.alarmState);
+    }
 }
 
 void brightnessControl()
@@ -463,6 +473,7 @@ void setclock()
             setclock_flag = false;
             setclock_countposition = 0;
             Clock.digitalclock_flag = true;
+            lcd.clear();
         }
     }
 }
@@ -537,8 +548,8 @@ void displayValue(int position, int row, char* value)
 {
     lcd.setCursor(7, 0);
     lcd.print(":");
-    lcd.setCursor(10, 0);
-    lcd.print(":");
+    // lcd.setCursor(10, 0);
+    // lcd.print(":");
     lcd.setCursor(4, 1);
     lcd.print(".");
     lcd.setCursor(7, 1);
@@ -547,6 +558,11 @@ void displayValue(int position, int row, char* value)
     {
         lcd.setCursor(15, 1);
         lcd.write(byte(0));
+    }
+    else
+    {
+        lcd.setCursor(15, 1);
+        lcd.print(" ");
     }
 }
 
@@ -579,9 +595,9 @@ int pushLeftButton()
     {
         hold = 250;
     }
-    if(digitalRead(LEFT_BUTTON_PIN) == LOW)
+    if(digitalRead(LEFT_BUTTON_PIN) == LOW) 
     {
-        if(timer(hold, &LButton.button_temp))
+        if(LButton.lastState == HIGH && timer(hold, &LButton.button_temp))
         {
             if(timer(2000, &LButton.hold_temp))
             {
@@ -593,6 +609,7 @@ int pushLeftButton()
     }
     else
     {
+        LButton.lastState = HIGH;
         LButton.hold_temp = 0;
         LButton.hold_flag = false;
     }
@@ -612,9 +629,9 @@ int pushRightButton()
     {
         hold = 250;
     }
-    if(digitalRead(RIGHT_BUTTON_PIN) == LOW)
+    if(digitalRead(RIGHT_BUTTON_PIN) == LOW) 
     {
-        if(timer(hold, &RButton.button_temp))
+        if(RButton.lastState == HIGH && timer(hold, &RButton.button_temp))
         {
             if(timer(2000, &RButton.hold_temp))
             {
@@ -626,6 +643,7 @@ int pushRightButton()
     }
     else
     {
+        RButton.lastState = HIGH;
         RButton.hold_temp = 0;
         RButton.hold_flag = false;
     }
@@ -726,12 +744,17 @@ void ClockToString(int value, int i, char* sValue)
 
 void EnterSetAlarm()
 {
-    if(Clock.digitalclock_flag && HoldSetButton())
+    if(Clock.digitalclock_flag && !Alarm.enterSetAlarm_flag && HoldSetButton())
     {
         Alarm.enterSetAlarm_flag = true;
         lcd.clear();
-        displayValue(Alarm.positions[0], 0, Clock.sClockElements[1]);
-        displayValue(Alarm.positions[1], 0, Clock.sClockElements[2]);
+        // *Alarm.minutes = *Clock.minutes;
+        // *Alarm.hour = *Clock.hour;
+        for(int i = 0; i < Alarm.numberOfElements; i++)
+        {
+            ClockToString(Alarm.alarmTime[i], i + 1, Alarm.sAlarmTime[i]);
+            displayValue(Alarm.positions[i], 0, Alarm.sAlarmTime[i]);
+        }
     }
 }
 
@@ -739,16 +762,49 @@ void SetAlarm()
 {
     if(Alarm.enterSetAlarm_flag)
     {
+        Alarm.armed_flag = false;
         Clock.displayClock_flag = false;
-        *Alarm.minutes = *Clock.minutes;
-        *Alarm.hour = *Clock.hour;
+
         lcd.setCursor(7, 0);
         lcd.print(":");
+        char bellSign[2] = "\x08";
+        blink(15, 1, bellSign);
 
         if(Alarm.count < Alarm.numberOfElements)
         {
-            ClockToString(Alarm.alarmTime[Alarm.count], Alarm.count, Alarm.sAlarmTime[Alarm.count]);
             blink(Alarm.positions[Alarm.count], 0, Alarm.sAlarmTime[Alarm.count]);
+            if(pushLeftButton())
+            {
+                switch (Alarm.count)
+                {
+                case 0:
+                    Alarm.alarmTime[Alarm.count] = Mod(Alarm.alarmTime[Alarm.count] - 1, 60);
+                    ClockToString(Alarm.alarmTime[Alarm.count], Alarm.count + 1, Alarm.sAlarmTime[Alarm.count]);
+                    break;
+                case 1:
+                    Alarm.alarmTime[Alarm.count] = Mod(Alarm.alarmTime[Alarm.count] - 1, 24);
+                    ClockToString(Alarm.alarmTime[Alarm.count], Alarm.count + 1, Alarm.sAlarmTime[Alarm.count]);
+                    break;
+                default:
+                    break;
+                }
+            }
+            if(pushRightButton())
+            {
+                switch (Alarm.count)
+                {
+                case 0:
+                    Alarm.alarmTime[Alarm.count] = Mod(Alarm.alarmTime[Alarm.count] + 1, 60);
+                    ClockToString(Alarm.alarmTime[Alarm.count], Alarm.count + 1, Alarm.sAlarmTime[Alarm.count]);
+                    break;
+                case 1:
+                    Alarm.alarmTime[Alarm.count] = Mod(Alarm.alarmTime[Alarm.count] + 1, 24);
+                    ClockToString(Alarm.alarmTime[Alarm.count], Alarm.count + 1, Alarm.sAlarmTime[Alarm.count]);
+                    break;
+                default:
+                    break;
+                }
+            }
             if(pushsetbutton())
             {
                 displayValue(Alarm.positions[Alarm.count], 0, Alarm.sAlarmTime[Alarm.count]);
@@ -760,6 +816,7 @@ void SetAlarm()
         {
             Alarm.enterSetAlarm_flag = false;
             Alarm.count = 0;
+            Alarm.armed_flag = true;
         }
     }
     else
@@ -797,7 +854,7 @@ void DisplayClock()
 {
     if(Clock.displayClock_flag && Clock.digitalclock_flag)
     {
-        for(int i = 0; i < clockElementsAmount; i++)
+        for(int i = 1; i < clockElementsAmount; i++)
         {
             ClockToString(Clock.elementsValue[i], i, Clock.sClockElements[i]);
             displayValue(Clock.elementsPositions[i], (int)i/3.0, Clock.sClockElements[i]);
@@ -806,5 +863,43 @@ void DisplayClock()
         lcd.setCursor(13, 0);
         lcd.print(Clock.sdayofweek_pl[dayofweek(*Clock.year, *Clock.month, *Clock.day)]);
         displaySigns();
+    }
+}
+
+void AlarmTurnOnOff()
+{
+    if(Clock.digitalclock_flag && !Alarm.enterSetAlarm_flag && pushsetbutton())
+    {
+        if(Alarm.turnOn_flag)
+        {
+            Alarm.turnOn_flag = false;
+            Alarm.mute_flag = true;
+        }
+        else
+        {
+            Alarm.armed_flag = !Alarm.armed_flag;
+        }
+    }
+}
+
+void EnterClockSetting()
+{
+    if(digitalRead(LEFT_BUTTON_PIN) == LOW && digitalRead(RIGHT_BUTTON_PIN) == LOW)
+    {
+        if(digitalRead(RIGHT_BUTTON_PIN) == LOW && digitalRead(LEFT_BUTTON_PIN) == LOW && !entersetclock_flag && timer(3000, &setclock_temp))
+        {
+            beepon = true;
+            entersetclock_flag = true;
+            setclock_flag = true;
+            Alarm.turnOn_flag = false;
+            Alarm.mute_flag = true;
+        }
+        RButton.lastState = LOW;
+        LButton.lastState = LOW;  
+    }
+    else
+    {
+        setclock_temp = 0;
+        entersetclock_flag = false;  
     }
 }
