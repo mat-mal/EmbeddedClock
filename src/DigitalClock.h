@@ -9,7 +9,6 @@
 
 _Alarm Alarm;
 _Clock Clock;
-_SetClock SetClock;
 _DispClock DispClock;
 
 const int BRIGHTNESS_PIN = 11;

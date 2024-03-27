@@ -2,7 +2,7 @@
 
 void setup()
 {
-    // debug_init();            //for debuging, hard to use
+    // debug_init();            //for debuging, hard to use with inputs
     // Serial.begin(9600);      //for debuging, "easy" to use
     analogWrite(BRIGHTNESS_PIN, brightness);
     lcd.begin(16, 2);

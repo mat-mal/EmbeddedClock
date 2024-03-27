@@ -35,8 +35,7 @@ struct _SetClock
     unsigned long setclock_timer = 0;
 };
 
-extern _Clock Clock;
-extern _SetClock SetClock;
+extern _Clock Clock;            //used in Alarm.cpp and DisplayClock.cpp
 
 void DigitalClock();
 bool IsLeapYear(int year);

@@ -4,7 +4,6 @@
 
 const int BUZZER_PIN = 8;
 extern unsigned long currenttime;
-// extern unsigned long temptime;
 extern unsigned long beep_timer;
 extern bool beepon;
 

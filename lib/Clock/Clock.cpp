@@ -3,6 +3,8 @@
 unsigned long temptime = 0;
 unsigned long oneMinute = 0;
 
+_SetClock SetClock;
+
 void DigitalClock()
 {
     oneMinute = currenttime - temptime;
@@ -221,7 +223,6 @@ void SettingClock()
                     }
                     else if(*Clock.month == 1 && !IsLeapYear(*Clock.year))
                     {
-                        // Clock.elementsValue[SetClock.setclock_countposition] = Mod(Clock.elementsValue[SetClock.setclock_countposition], 28);
                         Clock.elementsValue[SetClock.setclock_countposition] = Mod(Clock.elementsValue[SetClock.setclock_countposition] + 1, 28);
                     }
                     else if(*Clock.month == 1)

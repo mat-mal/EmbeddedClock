@@ -8,7 +8,6 @@ int Timer(unsigned int tocountdown, unsigned long *temp)
     }
     else if(currenttime - *temp >= tocountdown)
     {
-        //Serial.println(*temp);
         *temp = 0;
         return 1;
     }
@@ -21,13 +20,8 @@ void Beep()
     if(beepon)
     {   
         digitalWrite(BUZZER_PIN, HIGH);    
-        // beepon = false;
-        // beepcounter++;
-        // Serial.println(beep_timer);
         if(Timer(150, &beep_timer))
         {
-            //beepcounter = 0;
-            // beep_timer = 0;
             digitalWrite(BUZZER_PIN, LOW);
             beepon = false;
         }

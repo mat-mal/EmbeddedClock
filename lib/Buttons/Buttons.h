@@ -15,8 +15,8 @@ struct _Button
     int lastState;
 };
 
-extern _Button LButton;
-extern _Button RButton;
+extern _Button LButton;             //used in Clock.app and Alarm.cpp
+extern _Button RButton;             //used in Clock.app and Alarm.cpp
 
 int PushSetButton();
 int PushLRButtons(struct _Button *Button, int PIN);

@@ -16,7 +16,7 @@ struct _Alarm
     bool armed_flag = false;
     int alarmState = LOW;
     int numberOfElements = 2;
-    int alarmTime[2] = {1, 0};
+    int alarmTime[2] = {0, 0};
     int* minutes = &alarmTime[0];
     int* hour = &alarmTime[1];
     int count = 0;
@@ -26,7 +26,7 @@ struct _Alarm
 
 };
 
-extern _Alarm Alarm;
+extern _Alarm Alarm;            //used in Clock.h and DisplayClock.cpp
 
 void StartAlarm();
 void SetAlarm();
